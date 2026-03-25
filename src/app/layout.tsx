@@ -14,7 +14,7 @@ const geistMono = Geist_Mono({
 });
 
 export const metadata: Metadata = {
-  title: "Gemini Analyzer",
+  title: "Lupa de Requisitos",
   description: "Faça análises inteligentes de documentos usando IA.",
 };
 

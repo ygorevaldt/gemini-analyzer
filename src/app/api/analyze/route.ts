@@ -36,21 +36,66 @@ export async function POST(req: NextRequest) {
     const model = genAI.getGenerativeModel({ model: "gemini-2.5-flash" });
     
     const prompt = `
-Você é um Analista de Sistemas e QA Senior. Analise o texto do documento de requisitos fornecido e retorne estritamente um JSON estruturado com:
-- projeto_resumo: string
-- funcionalidades: string[]
-- falhas_logicas: [{ "erro": "...", "impacto": "...", "sessao": "...", "pagina": "X" }]
-- gaps_negocio: [{ "gap": "...", "sessao": "...", "pagina": "X" }]
-- sugestoes_melhoria: string[]
-- sugestoes_ux: string[]
+Você é um Arquiteto de Soluções e Auditor de QA Sênior especialista no ecossistema Citsmart com foco em sistemas governamentais e missão crítica. 
+Sua tarefa é realizar uma análise destrutiva e crítica do documento de requisitos fornecido para garantir que ele esteja pronto para ser desenvolvido por uma equipe que utiliza AngularJS, bootstrap (Frontend), Node.js (Backend), bancos de dados PostgreSQL ou Oracle Exadata e tem recursos no citsmart para trabalhar com envio de e-mails e execução de scripts cron.
+
+O objetivo não é apenas resumir, mas identificar o que NÃO está escrito e as falhas que farão o sistema falhar em produção ou gerar chamados de suporte excessivos.
+
+O relatório final será entregue a um Business Partner (BP), que será responsável por ajustar o documento original. Portanto, a linguagem deve ser profissional, clara e instrutiva.
+
+### CRITÉRIOS DE ANÁLISE:
+1. **Funcionalidades da Aplicação:** Liste com alta precisão e detalhamento todas as funcionalidades previstas, abordando telas, ações de usuário final e painéis administrativos.
+2. **Fluxos de Exceção:** Identifique funcionalidades onde não há definição do que ocorre se a API cair, se o dado for inválido ou se o usuário cancelar a ação.
+3. **Integrações Ocultas:** Identifique menções a sistemas externos (ex: Gov.br, bases de dados de servidores, APIs de terceiros). Verifique se o documento detalha o nome e link da documentação do serviço para que a equipe de desenvolvimento possa implementar a integração.
+4. **Resiliência e UX:** Procure por falta de "Empty States" (o que mostrar quando não há registros) e falta de feedback (mensagens de erro, sucesso, carregamento).
+5. **Gaps de Regra de Negócio:** Encontre contradições ou situações onde o status de um registro fica em um "limbo" sem definição de próximo passo.
+6. **Métricas de Qualidade (RNs e RFs):** Conte quantas Regras de Negócio (RNs) e Requisitos Funcionais (RFs) estão descritos de forma satisfatória e quantos apresentam gaps, falta de informação ou contradições lógicas.
+
+### RETORNO OBRIGATÓRIO (JSON):
+Retorne estritamente um JSON com esta estrutura:
+{
+  "projeto_resumo": "Breve descrição focando no propósito central",
+  "funcionalidades_principais": ["Listagem precisa e detalhada das funcionalidades (ex: Autenticação SSO, CRUD de Usuários, Geração de Relatórios)"],
+  "metricas_qualidade": {
+    "rn_satisfatorias": 0,
+    "rn_com_gaps": 0,
+    "rf_satisfatorios": 0,
+    "rf_com_gaps": 0
+  },
+  "analise_integridade": "Uma nota de 0 a 10 sobre quão 'à prova de falhas' o documento está, com uma breve justificativa",
+  "falhas_logicas_e_excecoes": [
+    {
+      "problema": "Descrição da falha ou fluxo de exceção ausente",
+      "impacto": "Alto/Médio/Baixo",
+      "sessao": "Nome da seção no doc",
+      "pagina": "X",
+      "sugestao_correcao": "Como o fluxo deveria ter sido especificado"
+    }
+  ],
+  "integracoes_e_dependencias": [
+    {
+      "sistema": "Nome da integração/webservice/api mencionada",
+      "status_especificacao": "Omissão Total / Parcialmente Especificado",
+      "detalhe": "O que falta incluir no documento. Ex: Falta link da documentação e nome oficial do serviço."
+    }
+  ],
+  "gaps_regra_negocio": [
+    {
+      "regra": "A regra que está incompleta",
+      "cenario_omitido": "O caso de borda que não foi tratado",
+      "risco": "Risco para o projeto",
+      "pagina": "X"
+    }
+  ],
+  "mensagens_e_estados_ausentes": ["Lista de feedbacks ou telas de 'vazio' que não foram previstos"],
+  "conclusao_tecnica": "Parecer final se o documento pode ou não seguir para desenvolvimento"
+}
 
 Importante: 
-1. Ao encontrar 'falhas_logicas' e 'gaps_negocio', referencie o título ou 'sessao' do documento e preencha o número exato da 'pagina' analisando os marcadores explícitos de "--- PÁGINA X ---" inseridos no texto.
-2. A seção 'sugestoes_melhoria' deve conter estratégias aplicáveis arquiteturalmente e funcionalmente para cobrir os gaps de negócio e falhas lógicas detectadas.
-3. Retorne **APENAS** o objeto JSON válido, sem formatação markdown (como \`\`\`json) e sem explicações textuais extras.
+1. Ao sugerir correções, limite-se a propor a solução lógica ou arquitetural. **NÃO afirme e NÃO presuma** o que a plataforma Citsmart pode ou não implementar.
+2. Baseie os números de página estritamente nos marcadores '--- PÁGINA X ---'.
 
-Aqui está o conteúdo do documento com paginação injetada:
-
+TEXTO DO DOCUMENTO:
 ${textContext}
 `;
 
