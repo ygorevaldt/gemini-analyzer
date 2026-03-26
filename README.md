@@ -25,6 +25,46 @@ Uma aplicação Web inteligente construída com **Next.js 14+ (App Router)** que
 - **[pdf-parse](https://www.npmjs.com/package/pdf-parse)** - Extração de texto de PDF no ambiente servidor
 - **[jsPDF / jsPDF AutoTable](https://github.com/simonbengtsson/jsPDF-AutoTable)** - Para suporte opcional de exportação de PDF no lado cliente
 
+## 🏗️ Arquitetura do Sistema
+
+A aplicação utiliza uma arquitetura baseada em um **Pipeline de Multi-Agentes** para processar documentos complexos com alta precisão e especialização.
+
+### 🧩 Componentes do Core
+
+1.  **Chunker**: Responsável por segmentar o texto extraído do PDF em blocos gerenciáveis. Isso permite processar documentos extensos sem exceder limites de contexto e focar a análise em partes específicas do documento.
+2.  **Pipeline Orchestrator**: Coordena a execução dos agentes. Ele gerencia o fluxo de dados entre os blocos de texto e os especialistas de IA, garantindo que cada parte do documento seja analisada sob múltiplas perspectivas.
+3.  **Agentes Especialistas**: Cada agente é configurado com prompts específicos para atuar em domínios distintos:
+    *   **Functionalities Agent**: Focado em identificar e descrever os requisitos funcionais.
+    *   **Business Rules Agent**: Especialista em regras de negócio e identificação de lacunas (gaps).
+    *   **Integrations Agent**: Mapeia dependências e comunicações com sistemas externos.
+    *   **Exceptions Agent**: Identifica fluxos de erro, estados de borda e mensagens ausentes.
+    *   **Conflicts Agent**: Detecta contradições lógicas e ambiguidades no texto.
+4.  **Aggregator**: Atua como um "Arquiteto de Soluções Sênior", recebendo as descobertas parciais de todos os agentes e consolidando-as em um relatório final estruturado, eliminando duplicatas e gerando métricas de qualidade.
+
+### 🔄 Fluxo de Execução (End-to-End)
+
+![Fluxo de Análise Multi-Agente](assets/diagrama-mermaid.png)
+
+```mermaid
+graph TD
+    A[Usuário: Upload PDF] --> B[API: /api/analyze]
+    B --> C[Extração de Texto - pdf-parse]
+    C --> D[Chunker: Segmentação de Texto]
+    D --> E[Pipeline: Orquestração]
+    
+    subgraph "Camada de Agentes (Análise em Paralelo)"
+        E --> F1[Functionalities Agent]
+        E --> F2[Business Rules Agent]
+        E --> F3[Integrations Agent]
+        E --> F4[Exceptions Agent]
+        E --> F5[Conflicts Agent]
+    end
+    
+    F1 & F2 & F3 & F4 & F5 --> G[Aggregator: Consolidação Inteligente]
+    G --> H[Frontend: Renderização de Dashboards]
+    H --> I[Usuário: Visualização do Relatório]
+```
+
 ## ⚙️ Pré-requisitos
 
 Para rodar o projeto localmente, certifique-se de ter instalado:
@@ -68,14 +108,20 @@ Abra [http://localhost:3000](http://localhost:3000) no seu navegador para utiliz
 
 ## 📁 Estrutura do Projeto
 
-- `src/app/page.tsx`: Interface principal da aplicação com a área de drag-and-drop e a exibição dos resultados. Utiliza `'use client'` estrategicamente para interações visuais.
-- `src/app/api/analyze/route.ts`: API Route Handler (`POST`) encarregado de receber o `FormData` contendo o PDF, extrair o texto utilizando o `pdf-parse`, montar o prompt estruturado e enviar para a API do Gemini.
-- `src/components/`: Componentes reutilizáveis da interface de usuário (Cards, Badges, Tabelas e estados de carregamento).
+- `src/app/page.tsx`: Interface principal da aplicação.
+- `src/app/api/analyze/route.ts`: Entry point da API que orquestra o processo de análise.
+- `src/lib/ai/`:
+    - `pipeline.ts`: Orquestrador dos agentes de IA.
+    - `chunker.ts`: Lógica de segmentação de documentos.
+    - `aggregator.ts`: Consolidação inteligente de resultados múltiplos.
+    - `agents/`: Implementação detalhada de cada especialista de análise.
+- `src/components/`: Componentes React para exibição de resultados e UI.
 
 ## 💡 Princípios de Arquitetura
 
-- **Alta Performance:** O texto extraído e a chamada ao modelo de IA ocorrem inteiramente do lado do Servidor. O modelo utilizado (`gemini-1.5-flash`) foi escolhido pela sua otimização em rapidez sem comprometer a qualidade da inferência.
-- **Nenhum Dado Armazenado:** Regra rigorosa de não utilizar banco de dados ou persistência no sistema de arquivos para o PDF, ideal para manusear projetos confidenciais.
+- **Especialização de Domínio**: Em vez de um único prompt genérico, utilizamos múltiplos agentes especialistas, cada um com uma instrução de sistema otimizada para identificar aspectos específicos do documento.
+- **Processamento em Memória**: Segurança rigorosa – o PDF é processado inteiramente em memória no servidor, sem persistência em disco ou banco de dados.
+- **Resiliência e Recuperação**: O sistema utiliza técnicas de retry e fallback no agregador JSON para garantir que falhas parciais de IA não interrompam a experiência do usuário.
 
 ---
 *Projeto desenvolvido para análise inteligente de requisitos de software e auxílio para QAs e Analistas de Sistemas.*

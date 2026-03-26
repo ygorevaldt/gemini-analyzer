@@ -8,7 +8,7 @@ export class Aggregator {
   constructor(apiKey: string) {
     const genAI = new GoogleGenerativeAI(apiKey);
     this.model = genAI.getGenerativeModel({ 
-      model: "gemini-2.5-flash",
+      model: "gemini-2.5-flash-lite",
       generationConfig: {
         responseMimeType: "application/json",
         temperature: 0.1
@@ -55,6 +55,9 @@ export class Aggregator {
       3. Calcular métricas aproximadas baseadas nos gaps encontrados.
       4. Listar falhas lógicas e riscos.
       5. Dar um parecer técnico final.
+
+      IMPORTANTE: Seja extremamente conciso e objetivo. Evite repetir informações. Vá direto ao ponto.
+      Retorna estritamente um JSON válido e nada mais que isso.
 
       FORMATO OBRIGATÓRIO (JSON):
       {

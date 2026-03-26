@@ -9,7 +9,7 @@ export class FunctionalitiesAgent implements Agent {
   constructor(apiKey: string) {
     const genAI = new GoogleGenerativeAI(apiKey);
     this.model = genAI.getGenerativeModel({ 
-      model: "gemini-2.5-flash", // Using a stable version
+      model: "gemini-2.5-flash-lite", // Using a stable version
       generationConfig: {
         responseMimeType: "application/json",
         temperature: 0.1
