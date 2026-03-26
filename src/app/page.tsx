@@ -1,7 +1,7 @@
 "use client";
 
 import { useState, useRef, useEffect } from "react";
-import { FileText, AlertTriangle, CheckCircle, Search, UploadCloud, Download, Lightbulb, ShieldAlert, Link as LinkIcon, Activity } from "lucide-react";
+import { FileText, AlertTriangle, CheckCircle, Search, UploadCloud, Download, Lightbulb, ShieldAlert, Link as LinkIcon, Activity, Code } from "lucide-react";
 import { ThemeToggle } from "@/components/theme-toggle";
 import jsPDF from "jspdf";
 import autoTable from "jspdf-autotable";
@@ -269,6 +269,71 @@ export default function Home() {
     doc.save("Relatorio_AnaliseCritica_LupaDeRequisitos.pdf");
   };
 
+  const handleGenerateHTML = () => {
+    if (!result) return;
+    
+    // Tenta pegar todo o grid do relatorio
+    const element = document.getElementById('report-content');
+    if (!element) return;
+
+    const reportHtml = element.innerHTML;
+    
+    // Template em string com Tailwind CDN forçando modo DARK (sempre elegante e legível)
+    const htmlTemplate = `
+<!DOCTYPE html>
+<html lang="pt-BR" class="dark">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Relatório - Lupa de Requisitos</title>
+    <script src="https://cdn.tailwindcss.com"></script>
+    <script>
+      tailwind.config = {
+        darkMode: 'class',
+      }
+    </script>
+    <style>
+      body {
+        font-family: ui-sans-serif, system-ui, sans-serif;
+        padding: 3rem;
+      }
+    </style>
+</head>
+<body class="bg-zinc-950 text-zinc-50 antialiased">
+    <div class="max-w-7xl mx-auto space-y-10">
+      <header class="text-center space-y-4 pb-8 mb-8 border-b border-zinc-800">
+        <h1 class="text-4xl font-bold tracking-tight text-blue-400">
+          Lupa de Requisitos
+        </h1>
+        <p class="text-xl text-zinc-300 font-medium">
+          Relatório de Auditoria e Integridade
+        </p>
+        <p class="text-sm text-zinc-500">
+          Gerado em: ${new Date().toLocaleString()}
+        </p>
+      </header>
+      
+      <div class="grid grid-cols-1 lg:grid-cols-2 gap-8">
+        ${reportHtml}
+      </div>
+    </div>
+</body>
+</html>
+    `;
+
+    const blob = new Blob([htmlTemplate], { type: 'text/html;charset=utf-8' });
+    const url = URL.createObjectURL(blob);
+    
+    const a = document.createElement('a');
+    a.href = url;
+    a.download = "Relatorio_AnaliseCritica_LupaDeRequisitos.html";
+    document.body.appendChild(a);
+    a.click();
+    
+    document.body.removeChild(a);
+    URL.revokeObjectURL(url);
+  };
+
   return (
     <div className="min-h-screen bg-zinc-50 dark:bg-zinc-950 text-zinc-900 dark:text-zinc-50 p-4 md:p-8 font-sans">
       <main className="max-w-7xl mx-auto space-y-12">
@@ -342,7 +407,13 @@ export default function Home() {
               <h2 className="text-3xl font-bold flex items-center gap-3">
                 <ShieldAlert className="w-8 h-8 text-blue-500" /> Auditoria Crítica do Documento
               </h2>
-              <div className="flex items-center gap-3 w-full sm:w-auto">
+              <div className="flex flex-wrap items-center gap-3 w-full sm:w-auto">
+                <button
+                  onClick={handleGenerateHTML}
+                  className="flex-1 sm:flex-none px-6 py-3 text-sm font-semibold bg-white border border-zinc-200 dark:border-zinc-700 dark:bg-zinc-800 rounded-full hover:bg-zinc-50 dark:hover:bg-zinc-700 transition shadow-sm flex items-center justify-center gap-2 text-zinc-700 dark:text-zinc-200"
+                >
+                  <Code className="w-5 h-5" /> Exportar HTML
+                </button>
                 <button
                   onClick={handleGeneratePDF}
                   className="flex-1 sm:flex-none px-6 py-3 text-sm font-semibold bg-white border border-zinc-200 dark:border-zinc-700 dark:bg-zinc-800 rounded-full hover:bg-zinc-50 dark:hover:bg-zinc-700 transition shadow-sm flex items-center justify-center gap-2 text-zinc-700 dark:text-zinc-200"
@@ -361,7 +432,7 @@ export default function Home() {
               </div>
             </div>
 
-            <div className="grid grid-cols-1 lg:grid-cols-2 gap-8">
+            <div id="report-content" className="grid grid-cols-1 lg:grid-cols-2 gap-8">
               {/* Resumo Card & Integridade / Conclusão */}
               <div className="col-span-1 lg:col-span-2 grid grid-cols-1 md:grid-cols-3 gap-6">
                 <div className="col-span-1 md:col-span-2 bg-white dark:bg-zinc-900 p-8 rounded-3xl shadow-sm border border-zinc-200 dark:border-zinc-800">
