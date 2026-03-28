@@ -8,7 +8,7 @@ export class Aggregator {
   constructor(apiKey: string) {
     const genAI = new GoogleGenerativeAI(apiKey);
     this.model = genAI.getGenerativeModel({ 
-      model: "gemini-2.5-flash-lite",
+      model: "gemini-2.5-pro",
       generationConfig: {
         responseMimeType: "application/json",
         temperature: 0.1
@@ -21,33 +21,38 @@ export class Aggregator {
     const functionalities = results
       .filter(r => r.agent === "Functionalities")
       .flatMap(r => r.funcionalidades || []);
+    const uniqueFunctionalities = [...new Set(functionalities)];
 
     const gaps = results
       .filter(r => r.agent === "Business Rules")
       .flatMap(r => r.gaps || []);
+    const uniqueGaps = [...new Set(gaps)];
 
     const integracoes = results
       .filter(r => r.agent === "Integrations")
       .flatMap(r => r.integracoes || []);
+    const uniqueIntegracoes = [...new Set(integracoes)];
 
     const problemasUX = results
       .filter(r => r.agent === "Exceptions")
       .flatMap(r => r.problemas_ux || []);
+    const uniqueProblemasUX = [...new Set(problemasUX)];
 
     const conflitos = results
       .filter(r => r.agent === "Conflicts")
       .flatMap(r => r.conflitos || []);
+    const uniqueConflitos = [...new Set(conflitos)];
 
     // Final prompt to synthesize everything into the expected format
     const prompt = `
       Você é um Arquiteto de Soluções Sênior. Sua tarefa é consolidar os resultados parciais de diversos agentes de análise de requisitos em um relatório final estruturado.
       
       DADOS COLETADOS:
-      Funcionalidades: ${JSON.stringify(functionalities.slice(0, 50))}
-      Gaps de Regra de Negócio: ${JSON.stringify(gaps.slice(0, 30))}
-      Integrações: ${JSON.stringify(integracoes.slice(0, 30))}
-      Problemas de UX/Exceções: ${JSON.stringify(problemasUX.slice(0, 30))}
-      Conflitos/Inconsistências: ${JSON.stringify(conflitos.slice(0, 30))}
+      Funcionalidades: ${JSON.stringify(uniqueFunctionalities)}
+      Gaps de Regra de Negócio: ${JSON.stringify(uniqueGaps)}
+      Integrações: ${JSON.stringify(uniqueIntegracoes)}
+      Problemas de UX/Exceções: ${JSON.stringify(uniqueProblemasUX)}
+      Conflitos/Inconsistências: ${JSON.stringify(uniqueConflitos)}
 
       OBJETIVO:
       1. Resumir o propósito do projeto.

@@ -12,7 +12,7 @@ export class Pipeline {
   async execute(chunks: Chunk[]): Promise<AnalysisResult[]> {
     const allResults: AnalysisResult[] = [];
 
-    const limit = pLimit(2);
+    const limit = pLimit(4);
 
     for (const chunk of chunks) {
       console.log(`Running pipeline for ${chunk.id}...`);
