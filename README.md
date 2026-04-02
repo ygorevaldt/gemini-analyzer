@@ -52,8 +52,6 @@ A aplicação utiliza uma arquitetura de **Pipeline de Multi-Agentes** para gara
 
 ### 🔄 Fluxo de Análise
 
-![Diagrama de Fluxo](assets/diagrama-mermaid.png)
-
 ```mermaid
 graph TD
     A[Usuário: Upload PDF] --> B[API /api/analyze]
