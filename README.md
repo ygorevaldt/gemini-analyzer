@@ -58,6 +58,17 @@ graph TD
 
 ---
 
+## ⚡ Performance & Economia (Context Caching)
+
+Para garantir alta performance e baixo custo em documentos extensos (>32k tokens), o sistema implementa uma camada de **Google Context Caching**:
+
+-   **SHA-256 Content Hashing**: Toda análise gera um identificador único baseado no conteúdo bruto do PDF.
+-   **Reuso Inteligente de Contexto**: O orquestrador verifica se já existe um cache ativo para este documento no Google Cloud antes de iniciar.
+-   **Economia de Tokens**: Re-análises do mesmo arquivo utilizam o cache existente, reduzindo os tokens de entrada a praticamente **zero**.
+-   **TTL Dinâmico**: Caches são mantidos por 24 horas, otimizando o fluxo de trabalho sem custos redundantes em sessões prolongadas.
+
+---
+
 ## 🛠️ Stack Tecnológica
 
 - **Frontend/Backend:** [Next.js 14+](https://nextjs.org/) (TypeScript)

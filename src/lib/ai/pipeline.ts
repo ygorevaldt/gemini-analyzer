@@ -49,7 +49,7 @@ export class Pipeline {
             model: "models/gemini-2.5-flash",
             displayName: contentHash,
             contents: [{ role: "user", parts: [{ text: fullText }] }],
-            ttlSeconds: 3600,
+            ttlSeconds: 86400, // 24 hours
           });
           console.log(`✅ Cache created successfully: ${cache.name}`);
           // @ts-ignore

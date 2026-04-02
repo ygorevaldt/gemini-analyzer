@@ -19,6 +19,8 @@ export type AnalysisResult = {
     sistema: string;
     status_especificacao: string;
     detalhe: string;
+    pagina?: string;
+    impacto?: string;
   }[];
   gaps_regra_negocio: {
     regra: string;
