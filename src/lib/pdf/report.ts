@@ -140,10 +140,6 @@ export function generatePDF(result: AnalysisResult) {
   startY = (doc as any).lastAutoTable.finalY + 15;
 
   if (result.falhas_logicas_e_excecoes && result.falhas_logicas_e_excecoes.length > 0) {
-    if (startY > doc.internal.pageSize.getHeight() - 40) {
-      doc.addPage();
-      startY = 20;
-    }
     autoTable(doc, {
       startY,
       head: [["Problema / Exceção Ausente", "Impacto", "Seção", "Pág", "Sugestão de Correção"]],
@@ -168,93 +164,6 @@ export function generatePDF(result: AnalysisResult) {
     startY = (doc as any).lastAutoTable.finalY + 15;
   }
 
-  if (result.gaps_regra_negocio && result.gaps_regra_negocio.length > 0) {
-    if (startY > doc.internal.pageSize.getHeight() - 40) {
-      doc.addPage();
-      startY = 20;
-    }
-    autoTable(doc, {
-      startY,
-      head: [["Regra Incompleta", "Cenário Omitido", "Risco", "Pág"]],
-      body: result.gaps_regra_negocio.map((g) => [g.regra, g.cenario_omitido, g.risco, g.pagina || "-"]),
-      theme: "grid",
-      headStyles: { fillColor: [249, 115, 22], textColor: 255 },
-      columnStyles: {
-        0: { cellWidth: 50 },
-        1: { cellWidth: 70 },
-        2: { cellWidth: 40 },
-        3: { cellWidth: 20, halign: "center" },
-      },
-      styles: { fontSize: 9 },
-    });
-    startY = (doc as any).lastAutoTable.finalY + 15;
-  }
-
-  if (result.integracoes_e_dependencias && result.integracoes_e_dependencias.length > 0) {
-    if (startY > doc.internal.pageSize.getHeight() - 40) {
-      doc.addPage();
-      startY = 20;
-    }
-    autoTable(doc, {
-      startY,
-      head: [["Sistema / API", "Status Especificação", "Detalhe do que falta"]],
-      body: result.integracoes_e_dependencias.map((sys) => [sys.sistema, sys.status_especificacao, sys.detalhe]),
-      theme: "grid",
-      headStyles: { fillColor: [59, 130, 246], textColor: 255 },
-      columnStyles: {
-        0: { cellWidth: 40 },
-        1: { cellWidth: 40 },
-        2: { cellWidth: 100 },
-      },
-      styles: { fontSize: 9 },
-    });
-    startY = (doc as any).lastAutoTable.finalY + 15;
-  }
-
-  if (result.conflitos_cruzados && result.conflitos_cruzados.length > 0) {
-    if (startY > doc.internal.pageSize.getHeight() - 40) {
-      doc.addPage();
-      startY = 20;
-    }
-    autoTable(doc, {
-      startY,
-      head: [["Descrição", "Tipo", "Impacto", "Página", "Sugestão"]],
-      body: result.conflitos_cruzados.map((c) => [
-        c.descricao,
-        c.tipo,
-        c.impacto,
-        c.pagina_referencia || "-",
-        c.sugestao_correcao,
-      ]),
-      theme: "grid",
-      headStyles: { fillColor: [139, 92, 246], textColor: 255 },
-      columnStyles: {
-        0: { cellWidth: 50 },
-        1: { cellWidth: 30 },
-        2: { cellWidth: 20 },
-        3: { cellWidth: 20, halign: "center" },
-        4: { cellWidth: 60 },
-      },
-      styles: { fontSize: 8 },
-    });
-    startY = (doc as any).lastAutoTable.finalY + 15;
-  }
-
-  if (result.mensagens_e_estados_ausentes && result.mensagens_e_estados_ausentes.length > 0) {
-    if (startY > doc.internal.pageSize.getHeight() - 40) {
-      doc.addPage();
-      startY = 20;
-    }
-    autoTable(doc, {
-      startY,
-      head: [["Mensagens e Estados Ausentes (Resiliência & UX)"]],
-      body: result.mensagens_e_estados_ausentes.map((s) => [s]),
-      theme: "grid",
-      headStyles: { fillColor: [99, 102, 241], textColor: 255 },
-      styles: { fontSize: 10 },
-    });
-  }
-
   doc.save("Relatorio_AnaliseCritica_LupaDeRequisitos.pdf");
 }
 
@@ -263,9 +172,46 @@ export function generateHTML(result: AnalysisResult) {
   if (!element) return;
 
   const reportHtml = element.innerHTML;
+  
+  // Custom dashboard for HTML export
+  const metrics = result.metricas_qualidade || { rn_satisfatorias: 0, rn_com_gaps: 0, rf_satisfatorios: 0, rf_com_gaps: 0 };
+  
+  const dashboardHtml = `
+    <section class="grid grid-cols-1 md:grid-cols-4 gap-4 mb-10">
+      <div class="bg-zinc-900 p-6 rounded-2xl border border-zinc-800">
+        <p class="text-xs uppercase tracking-widest text-zinc-500 mb-2">RNs OK</p>
+        <p class="text-3xl font-bold text-emerald-500">${metrics.rn_satisfatorias}</p>
+      </div>
+      <div class="bg-zinc-900 p-6 rounded-2xl border border-zinc-800">
+        <p class="text-xs uppercase tracking-widest text-zinc-500 mb-2">RNs c/ Gaps</p>
+        <p class="text-3xl font-bold text-orange-500">${metrics.rn_com_gaps}</p>
+      </div>
+      <div class="bg-zinc-900 p-6 rounded-2xl border border-zinc-800">
+        <p class="text-xs uppercase tracking-widest text-zinc-500 mb-2">RFs OK</p>
+        <p class="text-3xl font-bold text-blue-500">${metrics.rf_satisfatorios}</p>
+      </div>
+      <div class="bg-zinc-900 p-6 rounded-2xl border border-zinc-800">
+        <p class="text-xs uppercase tracking-widest text-zinc-500 mb-2">RFs Falhos</p>
+        <p class="text-3xl font-bold text-red-500">${metrics.rf_com_gaps}</p>
+      </div>
+    </section>
+
+    <section class="bg-blue-600/10 p-8 rounded-3xl border border-blue-500/20 mb-10">
+      <h2 class="text-xl font-bold text-blue-400 mb-4 uppercase tracking-wider">Saúde do Documento</h2>
+      <div class="w-full bg-zinc-800 h-4 rounded-full overflow-hidden flex">
+        <div style="width: ${Math.max(5, (metrics.rn_satisfatorias / (metrics.rn_satisfatorias + metrics.rn_com_gaps + 0.1)) * 100)}%" class="bg-emerald-500 h-full"></div>
+        <div style="width: ${Math.max(5, (metrics.rn_com_gaps / (metrics.rn_satisfatorias + metrics.rn_com_gaps + 0.1)) * 100)}%" class="bg-orange-500 h-full"></div>
+      </div>
+      <div class="flex justify-between mt-2 text-xs text-zinc-500 font-medium">
+        <span>Conformidade RN</span>
+        <span>Atenção Sugerida</span>
+      </div>
+    </section>
+  `;
+
   const htmlTemplate = `
 <!DOCTYPE html>
-<html lang="pt-BR" class="dark">
+<html lang="pt-BR">
 <head>
   <meta charset="UTF-8" />
   <meta name="viewport" content="width=device-width, initial-scale=1.0" />
@@ -275,17 +221,29 @@ export function generateHTML(result: AnalysisResult) {
     tailwind.config = { darkMode: 'class' };
   </script>
   <style>
-    body { font-family: ui-sans-serif, system-ui, sans-serif; padding: 3rem; }
+    body { font-family: ui-sans-serif, system-ui, sans-serif; padding: 4rem 2rem; background-color: #09090b; color: #f4f4f5; }
+    #html-report-container { max-width: 1200px; margin: 0 auto; }
+    .grid { display: grid; }
+    @media (min-width: 1024px) { .lg\\:grid-cols-2 { grid-template-cols: repeat(2, minmax(0, 1fr)); } }
   </style>
 </head>
-<body class="bg-zinc-950 text-zinc-50 antialiased">
-  <div class="max-w-7xl mx-auto space-y-10">
-    <header class="text-center space-y-4 pb-8 mb-8 border-b border-zinc-800">
-      <h1 class="text-4xl font-bold tracking-tight text-blue-400">Lupa de Requisitos</h1>
-      <p class="text-xl text-zinc-300 font-medium">Relatório de Auditoria e Integridade</p>
-      <p class="text-sm text-zinc-500">Gerado em: ${new Date().toLocaleString()}</p>
+<body class="dark">
+  <div id="html-report-container">
+    <header class="text-center space-y-4 pb-12 mb-12 border-b border-zinc-800">
+      <h1 class="text-5xl font-black tracking-tighter text-blue-500">LUPA DE REQUISITOS</h1>
+      <p class="text-2xl text-zinc-400 font-light italic">Relatório de Auditoria Técnica de Software</p>
+      <p class="text-sm text-zinc-600 uppercase tracking-widest mt-4">Gerado em: ${new Date().toLocaleString()}</p>
     </header>
-    <div class="grid grid-cols-1 lg:grid-cols-2 gap-8">${reportHtml}</div>
+    
+    ${dashboardHtml}
+
+    <div class="grid grid-cols-1 lg:grid-cols-2 gap-8">
+      ${reportHtml}
+    </div>
+
+    <footer class="mt-20 pt-10 border-t border-zinc-800 text-center text-zinc-600 text-xs">
+      <p>Gerado automaticamente pela Lupa de Requisitos via Multi-Agent AI Pipeline.</p>
+    </footer>
   </div>
 </body>
 </html>
@@ -295,7 +253,7 @@ export function generateHTML(result: AnalysisResult) {
   const url = URL.createObjectURL(blob);
   const a = document.createElement("a");
   a.href = url;
-  a.download = "Relatorio_AnaliseCritica_LupaDeRequisitos.html";
+  a.download = "Relatorio_Auditoria_LupaDeRequisitos.html";
   document.body.appendChild(a);
   a.click();
   document.body.removeChild(a);

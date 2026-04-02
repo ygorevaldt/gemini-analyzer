@@ -7,6 +7,19 @@ type AnalysisSectionsProps = {
   result: AnalysisResult;
 };
 
+// Helper to prevent "Objects are not valid as a React child" from AI hallucinations
+const renderSafeText = (val: any): string => {
+  if (val === null || val === undefined) return "";
+  if (typeof val === "string") return val;
+  if (typeof val === "object") {
+    // Try to find a string property that might contain the message
+    const firstStringProp = Object.values(val).find(v => typeof v === "string");
+    if (firstStringProp) return String(firstStringProp);
+    return JSON.stringify(val);
+  }
+  return String(val);
+};
+
 export function AnalysisSections({ result }: AnalysisSectionsProps) {
   return (
     <div id="report-content" className="grid grid-cols-1 lg:grid-cols-2 gap-8">
@@ -16,7 +29,7 @@ export function AnalysisSections({ result }: AnalysisSectionsProps) {
             <FileText className="w-6 h-6 text-blue-500" /> Propósito Central
           </h3>
           <p className="text-zinc-700 dark:text-zinc-300 leading-relaxed text-lg">
-            {result.projeto_resumo}
+            {renderSafeText(result.projeto_resumo)}
           </p>
         </div>
 
@@ -25,7 +38,7 @@ export function AnalysisSections({ result }: AnalysisSectionsProps) {
             <Activity className="w-5 h-5 text-indigo-500" /> Análise de Integridade
           </h3>
           <p className="text-zinc-700 dark:text-zinc-300 leading-relaxed font-medium mb-4">
-            {result.analise_integridade}
+            {renderSafeText(result.analise_integridade)}
           </p>
 
           {result.metricas_qualidade && (
@@ -62,7 +75,7 @@ export function AnalysisSections({ result }: AnalysisSectionsProps) {
         <div className="flex flex-wrap gap-2">
           {result.funcionalidades_principais.map((func, i) => (
             <span key={i} className="px-4 py-2 bg-emerald-50 dark:bg-emerald-900/20 text-emerald-800 dark:text-emerald-200 border border-emerald-200 dark:border-emerald-800/50 rounded-xl text-[0.95rem] font-medium">
-              {func}
+              {renderSafeText(func)}
             </span>
           ))}
         </div>
@@ -75,7 +88,7 @@ export function AnalysisSections({ result }: AnalysisSectionsProps) {
         <div className="flex flex-wrap gap-2">
           {result.mensagens_e_estados_ausentes?.map((sug, i) => (
             <span key={i} className="px-4 py-2 bg-indigo-50 dark:bg-indigo-900/20 text-indigo-800 dark:text-indigo-200 border border-indigo-200 dark:border-indigo-800/50 rounded-xl text-[0.95rem] font-medium">
-              {sug}
+              {renderSafeText(sug)}
             </span>
           ))}
         </div>
@@ -89,23 +102,23 @@ export function AnalysisSections({ result }: AnalysisSectionsProps) {
           <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
             {result.falhas_logicas_e_excecoes.map((falha, i) => (
               <div key={i} className="flex flex-col p-6 bg-white dark:bg-zinc-900 rounded-2xl shadow-sm border border-red-100 dark:border-red-900/40 hover:shadow-md transition">
-                <p className="font-bold text-zinc-900 dark:text-zinc-100 mb-3 text-lg leading-relaxed">{falha.problema}</p>
+                <p className="font-bold text-zinc-900 dark:text-zinc-100 mb-3 text-lg leading-relaxed">{renderSafeText(falha.problema)}</p>
                 <div className="mb-4 text-zinc-700 dark:text-zinc-300 text-[0.95rem] bg-zinc-50 dark:bg-zinc-800/50 p-3 rounded-xl border border-zinc-100 dark:border-zinc-800">
                   <span className="block font-bold text-xs uppercase text-zinc-500 dark:text-zinc-400 mb-1">Como Sugerida a Correção</span>
-                  {falha.sugestao_correcao}
+                  {renderSafeText(falha.sugestao_correcao)}
                 </div>
                 <div className="mt-auto grid grid-cols-2 gap-4 pt-4 border-t border-red-50 dark:border-red-900/30">
                   <p className="text-red-700 dark:text-red-400 text-sm font-medium">
                     <span className="block font-bold uppercase tracking-wide text-[0.7rem] text-red-500 mb-1">Seção</span>
-                    {falha.sessao || 'N/A'}
+                    {renderSafeText(falha.sessao || 'N/A')}
                   </p>
                   <p className="text-red-700 dark:text-red-400 text-sm font-medium">
                     <span className="block font-bold uppercase tracking-wide text-[0.7rem] text-red-500 mb-1">Página</span>
-                    {falha.pagina || '?'}
+                    {renderSafeText(falha.pagina || '?')}
                   </p>
                   <p className="text-red-700 dark:text-red-400 text-sm col-span-2 font-medium">
                     <span className="block font-bold uppercase tracking-wide text-[0.7rem] text-red-500 mb-1">Impacto Previsto</span>
-                    {falha.impacto}
+                    {renderSafeText(falha.impacto)}
                   </p>
                 </div>
               </div>
@@ -124,23 +137,23 @@ export function AnalysisSections({ result }: AnalysisSectionsProps) {
           <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
             {result.conflitos_cruzados.map((item, i) => (
               <div key={i} className="flex flex-col p-6 bg-white dark:bg-zinc-900 rounded-2xl shadow-sm border border-violet-100 dark:border-violet-900/40 hover:shadow-md transition">
-                <p className="font-bold text-zinc-900 dark:text-zinc-100 mb-3 text-lg leading-relaxed">{item.descricao}</p>
+                <p className="font-bold text-zinc-900 dark:text-zinc-100 mb-3 text-lg leading-relaxed">{renderSafeText(item.descricao)}</p>
                 <div className="mb-4 text-violet-800 dark:text-violet-300 text-[0.95rem] bg-violet-50/50 dark:bg-violet-900/10 p-3 rounded-xl border border-violet-100 dark:border-violet-900/20">
                   <span className="block font-bold text-xs uppercase text-violet-600 dark:text-violet-500 mb-1">Recomendação de Correção</span>
-                  {item.sugestao_correcao}
+                  {renderSafeText(item.sugestao_correcao)}
                 </div>
                 <div className="mt-auto grid grid-cols-2 gap-4 pt-4 border-t border-violet-50 dark:border-violet-900/30">
                   <p className="text-violet-700 dark:text-violet-400 text-sm font-medium">
                     <span className="block font-bold uppercase tracking-wide text-[0.7rem] text-violet-500 mb-1">Tipo</span>
-                    {item.tipo}
+                    {renderSafeText(item.tipo)}
                   </p>
                   <p className="text-violet-700 dark:text-violet-400 text-sm font-medium">
                     <span className="block font-bold uppercase tracking-wide text-[0.7rem] text-violet-500 mb-1">Página</span>
-                    {item.pagina_referencia || '?'}
+                    {renderSafeText(item.pagina_referencia || '?')}
                   </p>
                   <p className="text-violet-700 dark:text-violet-400 text-sm col-span-2 font-medium">
                     <span className="block font-bold uppercase tracking-wide text-[0.7rem] text-violet-500 mb-1">Impacto</span>
-                    {item.impacto}
+                    {renderSafeText(item.impacto)}
                   </p>
                 </div>
               </div>
@@ -159,19 +172,19 @@ export function AnalysisSections({ result }: AnalysisSectionsProps) {
           <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
             {result.gaps_regra_negocio.map((g, i) => (
               <div key={i} className="flex flex-col p-6 bg-white dark:bg-zinc-900 rounded-2xl shadow-sm border border-orange-100 dark:border-orange-900/40 hover:shadow-md transition">
-                <p className="font-bold text-zinc-900 dark:text-zinc-100 mb-2 text-lg leading-relaxed">{g.regra}</p>
+                <p className="font-bold text-zinc-900 dark:text-zinc-100 mb-2 text-lg leading-relaxed">{renderSafeText(g.regra)}</p>
                 <div className="mb-4 text-orange-800 dark:text-orange-300 text-[0.95rem] bg-orange-50/50 dark:bg-orange-900/10 p-3 rounded-xl border border-orange-100 dark:border-orange-900/20">
                   <span className="block font-bold text-xs uppercase text-orange-600 dark:text-orange-500 mb-1">Cenário Omitido</span>
-                  {g.cenario_omitido}
+                  {renderSafeText(g.cenario_omitido)}
                 </div>
                 <div className="mt-auto grid grid-cols-2 gap-4 pt-4 border-t border-orange-50 dark:border-orange-900/30">
                   <p className="text-orange-700 dark:text-orange-400 text-sm font-medium col-span-2">
                     <span className="block font-bold uppercase tracking-wide text-[0.7rem] text-orange-500 mb-1">Risco</span>
-                    {g.risco}
+                    {renderSafeText(g.risco)}
                   </p>
                   <p className="text-orange-700 dark:text-orange-400 text-sm font-medium">
                     <span className="block font-bold uppercase tracking-wide text-[0.7rem] text-orange-500 mb-1">Página</span>
-                    {g.pagina || '?'}
+                    {renderSafeText(g.pagina || '?')}
                   </p>
                 </div>
               </div>
@@ -191,10 +204,10 @@ export function AnalysisSections({ result }: AnalysisSectionsProps) {
             {result.integracoes_e_dependencias.map((sys, i) => (
               <li key={i} className="flex flex-col gap-2 items-start text-zinc-800 dark:text-zinc-200 p-6 bg-white dark:bg-zinc-900 rounded-2xl shadow-sm border border-blue-100 dark:border-blue-900/40">
                 <div className="flex justify-between items-center w-full mb-2">
-                  <span className="text-[1.1rem] font-bold text-blue-700 dark:text-blue-400">{sys.sistema}</span>
-                  <span className="px-3 py-1 bg-blue-100 dark:bg-blue-900/50 text-blue-800 dark:text-blue-300 text-xs font-bold rounded-full uppercase tracking-wider border border-blue-200 dark:border-blue-800">{sys.status_especificacao}</span>
+                  <span className="text-[1.1rem] font-bold text-blue-700 dark:text-blue-400">{renderSafeText(sys.sistema)}</span>
+                  <span className="px-3 py-1 bg-blue-100 dark:bg-blue-900/50 text-blue-800 dark:text-blue-300 text-xs font-bold rounded-full uppercase tracking-wider border border-blue-200 dark:border-blue-800">{renderSafeText(sys.status_especificacao)}</span>
                 </div>
-                <span className="text-zinc-600 dark:text-zinc-400 text-[0.95rem] leading-relaxed">{sys.detalhe}</span>
+                <span className="text-zinc-600 dark:text-zinc-400 text-[0.95rem] leading-relaxed">{renderSafeText(sys.detalhe)}</span>
               </li>
             ))}
           </ul>
@@ -207,8 +220,8 @@ export function AnalysisSections({ result }: AnalysisSectionsProps) {
         <h3 className="text-2xl font-bold mb-6 flex items-center gap-2 text-zinc-100 dark:text-zinc-900 uppercase tracking-wide">
           <ShieldAlert className="w-6 h-6" /> Parecer e Conclusão Técnica
         </h3>
-        <p className="text-zinc-300 dark:text-zinc-700 text-lg leading-relaxed font-medium">
-          {result.conclusao_tecnica}
+        <p className="text-zinc-300 dark:text-zinc-700 text-lg leading-relaxed font-medium whitespace-pre-wrap">
+          {renderSafeText(result.conclusao_tecnica)}
         </p>
       </div>
     </div>

@@ -1,3 +1,5 @@
+import { GenerativeModel } from "@google/generative-ai";
+
 export interface AnalysisResult {
   [key: string]: any;
 }
@@ -12,6 +14,7 @@ export interface Chunk {
 export interface Agent {
   name: string;
   analyze(chunk: Chunk): Promise<AnalysisResult>;
+  setModel?(model: GenerativeModel): void;
 }
 
 export interface PipelineStep {

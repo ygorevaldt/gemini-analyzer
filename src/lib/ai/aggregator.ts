@@ -12,8 +12,13 @@ export class Aggregator {
       generationConfig: {
         responseMimeType: "application/json",
         temperature: 0.1,
+        maxOutputTokens: 8192,
       },
     });
+  }
+
+  setModel(model: GenerativeModel) {
+    this.model = model;
   }
 
   async aggregate(results: AnalysisResult[]): Promise<FinalReport> {
@@ -52,8 +57,7 @@ export class Aggregator {
 
     // Final prompt to synthesize everything into the expected format
     const prompt = `
-      Você é um Arquiteto de Soluções Sênior responsável por gerar um relatório técnico completo para o BP refinar um documento de requisitos.
-      Sua tarefa é consolidar os resultados parciais de diversos agentes de análise em um único relatório acionável, preciso e rico em contexto.
+      Você é um Arquiteto de Soluções Sênior. Sua tarefa é consolidar os resultados de diversos agentes em um único RELATÓRIO TÉCNICO.
       
       DADOS COLETADOS:
       Funcionalidades: ${JSON.stringify(uniqueFunctionalities)}
@@ -61,25 +65,12 @@ export class Aggregator {
       Integrações: ${JSON.stringify(uniqueIntegracoes)}
       Problemas de UX/Exceções: ${JSON.stringify(uniqueProblemasUX)}
       Conflitos/Inconsistências: ${JSON.stringify(uniqueConflitos)}
-      Conflitos Cruzados entre partes do documento: ${JSON.stringify(uniqueCrossChunkFindings)}
+      Conflitos Cruzados: ${JSON.stringify(uniqueCrossChunkFindings)}
 
-      OBJETIVOS PRINCIPAIS:
-      1. Resumir o propósito do projeto e o valor esperado.
-      2. Consolidar funcionalidades com título, descrição curta e referência de página.
-      3. Identificar todos os gaps RN/RF, estados omitidos e comportamentos não cobertos.
-      4. Classificar cada gap como RN ou RF sempre que possível e use isso para as métricas.
-      5. Destacar falhas lógicas, inconsistências e impactos de produção.
-      6. Listar integrações e dependências com situação de especificação, risco e impacto.
-      7. Gerar sugestões claras e específicas para o BP corrigir o documento e reduzir bugs em produção.
-
-      IMPORTANTE:
-      - Utilize as páginas e descrições sempre que disponíveis.
-      - Priorize itens que podem gerar quebra em produção, perda de dados ou comportamento incorreto.
-      - Se um problema estiver relacionado a múltiplos pontos do documento, apresente o contexto mais relevante.
-      - Se os agentes forneceram somente fragmentos, use o conjunto dos resultados para inferir problemas adicionais relacionados.
-      - Retorne estritamente um JSON válido e nada mais.
-
-      FORMATO OBRIGATÓRIO (JSON):
+      REQUISITO CRÍTICO DE FORMATO:
+      Retorne um JSON válido e COMPLETO. O campo "conclusao_tecnica" é OBRIGATÓRIO e deve conter sua visão profissional final.
+      
+      ESTRUTURA ESPERADA (JSON):
       {
         "projeto_resumo": "...",
         "funcionalidades_principais": ["..."],
@@ -89,7 +80,7 @@ export class Aggregator {
           "rf_satisfatorios": 0,
           "rf_com_gaps": 0
         },
-        "analise_integridade": "Nota de 0 a 10 com justificativa detalhada",
+        "analise_integridade": "...",
         "falhas_logicas_e_excecoes": [
           {
             "problema": "...",
@@ -102,7 +93,7 @@ export class Aggregator {
         "integracoes_e_dependencias": [
           {
             "sistema": "...",
-            "status_especificacao": "Completo" | "Incompleto" | "Ausente",
+            "status_especificacao": "Completo/Incompleto/Ausente",
             "detalhe": "...",
             "pagina": "...",
             "impacto": "..."
@@ -118,15 +109,16 @@ export class Aggregator {
           }
         ],
         "mensagens_e_estados_ausentes": ["..."],
-      "conflitos_cruzados": [
-        {
-          "descricao": "...",
-          "pagina_referencia": "...",
-          "impacto": "Alto" | "Médio" | "Baixo" | "Não Identificado",
-          "tipo": "Contradição" | "Ambiguidade" | "Brecha de Cobertura" | "Inconsistência" | "Dependência Omitida",
-          "sugestao_correcao": "..."
-        }
-      ],
+        "conflitos_cruzados": [
+          {
+            "descricao": "...",
+            "pagina_referencia": "...",
+            "impacto": "Alto/Médio/Baixo",
+            "tipo": "...",
+            "sugestao_correcao": "..."
+          }
+        ],
+        "conclusao_tecnica": "SUMÁRIO TÉCNICO FINAL: Sua análise profissional aqui."
       }
     `;
 
@@ -135,46 +127,53 @@ export class Aggregator {
     const text = response.text().trim();
     const parsed = safeParseJson<Partial<FinalReport>>(text, "aggregator");
 
+    // Fallback logic check if empty
+    const ensureString = (val: any) => (typeof val === "string" ? val : JSON.stringify(val));
+
     if (!parsed || typeof parsed !== "object") {
-      console.error("Error parsing final aggregation JSON or invalid report object.", { text: text.slice(0, 1000) });
+      console.error("Error parsing final aggregation JSON.", { text: text.slice(0, 1000) });
       return {
-        projeto_resumo: "Erro na consolidação",
-        funcionalidades_principais: functionalities.slice(0, 10),
-        metricas_qualidade: { rn_satisfatorias: 0, rn_com_gaps: 0, rf_satisfatorios: 0, rf_com_gaps: 0 },
-        analise_integridade: "0 - Falha sistêmica",
-        falhas_logicas_e_excecoes: [],
-        integracoes_e_dependencias: [],
-        gaps_regra_negocio: [],
-        mensagens_e_estados_ausentes: problemasUX.slice(0, 10),
-        conflitos_cruzados: [],
-        conclusao_tecnica: "Não foi possível gerar um parecer automático.",
+        projeto_resumo: "Erro na consolidação automática.",
+        funcionalidades_principais: uniqueFunctionalities.map(f => f.title || "Sem título"),
+        metricas_qualidade: { rn_satisfatorias: 0, rn_com_gaps: uniqueGaps.length, rf_satisfatorios: 0, rf_com_gaps: uniqueProblemasUX.length },
+        analise_integridade: "Não foi possível sintetizar a inteligência.",
+        falhas_logicas_e_excecoes: uniqueProblemasUX,
+        integracoes_e_dependencias: uniqueIntegracoes,
+        gaps_regra_negocio: uniqueGaps,
+        mensagens_e_estados_ausentes: uniqueProblemasUX.map((p: any) => p.problema || "Não identificado"),
+        conflitos_cruzados: uniqueCrossChunkFindings,
+        conclusao_tecnica: "O modelo de agregação falhou ao processar a resposta completa. Verifique os dados detalhados acima.",
       };
     }
 
     return {
-      projeto_resumo: String(parsed.projeto_resumo || "Relatório parcial gerado devido a erro de síntese."),
-      funcionalidades_principais: Array.isArray(parsed.funcionalidades_principais)
+      projeto_resumo: ensureString(parsed.projeto_resumo || "Não disponível."),
+      funcionalidades_principais: Array.isArray(parsed.funcionalidades_principais) && parsed.funcionalidades_principais.length > 0
         ? parsed.funcionalidades_principais
-        : functionalities.slice(0, 10),
+        : uniqueFunctionalities.map(f => f.title || "Sem título"),
       metricas_qualidade: parsed.metricas_qualidade || {
         rn_satisfatorias: 0,
-        rn_com_gaps: 0,
+        rn_com_gaps: uniqueGaps.length,
         rf_satisfatorios: 0,
-        rf_com_gaps: 0,
+        rf_com_gaps: uniqueProblemasUX.length,
       },
-      analise_integridade: String(parsed.analise_integridade || "Não foi possível gerar a análise de integridade."),
-      falhas_logicas_e_excecoes: Array.isArray(parsed.falhas_logicas_e_excecoes)
+      analise_integridade: ensureString(parsed.analise_integridade || "Verificar dados abaixo."),
+      falhas_logicas_e_excecoes: (Array.isArray(parsed.falhas_logicas_e_excecoes) && parsed.falhas_logicas_e_excecoes.length > 0)
         ? parsed.falhas_logicas_e_excecoes
-        : [],
-      integracoes_e_dependencias: Array.isArray(parsed.integracoes_e_dependencias)
+        : uniqueProblemasUX,
+      integracoes_e_dependencias: (Array.isArray(parsed.integracoes_e_dependencias) && parsed.integracoes_e_dependencias.length > 0)
         ? parsed.integracoes_e_dependencias
-        : [],
-      gaps_regra_negocio: Array.isArray(parsed.gaps_regra_negocio) ? parsed.gaps_regra_negocio : [],
-      mensagens_e_estados_ausentes: Array.isArray(parsed.mensagens_e_estados_ausentes)
+        : uniqueIntegracoes,
+      gaps_regra_negocio: (Array.isArray(parsed.gaps_regra_negocio) && parsed.gaps_regra_negocio.length > 0)
+        ? parsed.gaps_regra_negocio
+        : uniqueGaps,
+      mensagens_e_estados_ausentes: (Array.isArray(parsed.mensagens_e_estados_ausentes) && parsed.mensagens_e_estados_ausentes.length > 0)
         ? parsed.mensagens_e_estados_ausentes
-        : problemasUX.slice(0, 10),
-      conflitos_cruzados: Array.isArray(parsed.conflitos_cruzados) ? parsed.conflitos_cruzados : [],
-      conclusao_tecnica: String(parsed.conclusao_tecnica || "Não foi possível gerar um parecer automático."),
+        : uniqueProblemasUX.map((p: any) => p.problema || "Não identificado"),
+      conflitos_cruzados: (Array.isArray(parsed.conflitos_cruzados) && parsed.conflitos_cruzados.length > 0)
+        ? parsed.conflitos_cruzados
+        : uniqueCrossChunkFindings,
+      conclusao_tecnica: ensureString(parsed.conclusao_tecnica || "Análise completa disponível nos detalhes acima."),
     };
   }
 }

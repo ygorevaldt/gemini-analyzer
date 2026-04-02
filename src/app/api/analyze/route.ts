@@ -53,7 +53,7 @@ function buildPartialFinalReport(results: any[]) {
     falhas_logicas_e_excecoes: problemasUX,
     integracoes_e_dependencias: integracoes,
     gaps_regra_negocio: gaps,
-    mensagens_e_estados_ausentes: problemasUX.slice(0, 10).map((item: any) => item.problema || "Não identificado"),
+    mensagens_e_estados_ausentes: problemasUX.map((item: any) => item.problema || "Não identificado"),
     conflitos_cruzados: conflitos_cruzados,
     conclusao_tecnica:
       "A agregação final falhou, mas há resultados parciais disponíveis. Refaça a análise assim que possível.",
@@ -101,10 +101,13 @@ export async function POST(req: NextRequest) {
       .addAgent(new ConflictsAgent(apiKey));
 
     console.log(`Starting analysis for ${chunks.length} chunks...`);
-    const intermediateResults = await pipeline.execute(chunks);
+    const { results: intermediateResults, cachedModel } = await pipeline.execute(chunks, apiKey);
 
     // 4. Cross-chunk review of the whole document
     const crossChunkAgent = new CrossChunkAgent(apiKey);
+    if (cachedModel) {
+      crossChunkAgent.setModel(cachedModel);
+    }
     const crossChunkResult = await crossChunkAgent.analyzeDocument(chunks, intermediateResults);
     intermediateResults.push({
       agent: crossChunkAgent.name,
@@ -114,6 +117,9 @@ export async function POST(req: NextRequest) {
 
     // 5. Aggregate results
     const aggregator = new Aggregator(apiKey);
+    if (cachedModel) {
+      aggregator.setModel(cachedModel);
+    }
     let finalReport;
 
     try {

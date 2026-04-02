@@ -6,6 +6,8 @@ export class ConflictsAgent implements Agent {
   name = "Conflicts";
   private model: GenerativeModel;
 
+  private usingCache = false;
+
   constructor(apiKey: string) {
     const genAI = new GoogleGenerativeAI(apiKey);
     this.model = genAI.getGenerativeModel({
@@ -13,34 +15,34 @@ export class ConflictsAgent implements Agent {
       generationConfig: {
         responseMimeType: "application/json",
         temperature: 0.1,
+        maxOutputTokens: 8192,
       },
     });
   }
 
+  setModel(model: GenerativeModel) {
+    this.model = model;
+    this.usingCache = true;
+  }
+
   async analyze(chunk: Chunk): Promise<AnalysisResult> {
     const prompt = `
-      Você é um Auditor de Sistemas e Especialista em Garantia de Qualidade.
-      Seu objetivo é identificar contradições, ambiguidades ou conflitos lógicos no texto abaixo.
+      Você é um Auditor de Sistemas e Especialista em Garantia de Qualidade. Sua tarefa é identificar CONFLITOS E CONTRADIÇÕES.
       
-      Regras:
-      1. Procure por trechos que descrevem regras diferentes para o mesmo fluxo.
-      2. Identifique termos ou condições ambíguas que podem gerar interpretações variadas.
-      3. Aponte conflitos entre requisitos funcionais, regras de negócio e exceções.
-      4. Para cada conflito, indique gravidade, página e recomendação de correção.
-      5. Retorne no formato JSON sugerido.
+      FOCO DA ANÁLISE (Páginas ${chunk.startPage} a ${chunk.endPage}):
+      ${this.usingCache ? "(O conteúdo completo está disponível no contexto de cache)" : chunk.content}
 
-      Texto do Documento (Páginas ${chunk.startPage} a ${chunk.endPage}):
-      ${chunk.content}
-
-      Retorne estritamente um JSON:
+      REQUISITO CRÍTICO DE FORMATO:
+      Retorne APENAS um objeto JSON no formato abaixo, sem Markdown, sem preâmbulo.
+      
+      ESTRUTURA ESPERADA:
       {
         "conflitos": [
           {
-            "descricao": string,
-            "tipo": "Contradição" | "Ambiguidade" | "Inconsistência",
-            "pagina": string,
-            "gravidade": "Alto" | "Médio" | "Baixo",
-            "recomendacao": string
+            "problema": "O que está em conflito?",
+            "gravidade": "Crítica" | "Média" | "Baixa",
+            "pagina": "${chunk.startPage}",
+            "sugestao_correcao": "Como o BP deve unificar a regra"
           }
         ]
       }

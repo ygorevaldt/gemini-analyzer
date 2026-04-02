@@ -6,6 +6,8 @@ export class IntegrationsAgent implements Agent {
   name = "Integrations";
   private model: GenerativeModel;
 
+  private usingCache = false;
+
   constructor(apiKey: string) {
     const genAI = new GoogleGenerativeAI(apiKey);
     this.model = genAI.getGenerativeModel({
@@ -13,33 +15,35 @@ export class IntegrationsAgent implements Agent {
       generationConfig: {
         responseMimeType: "application/json",
         temperature: 0.1,
+        maxOutputTokens: 8192,
       },
     });
   }
 
+  setModel(model: GenerativeModel) {
+    this.model = model;
+    this.usingCache = true;
+  }
+
   async analyze(chunk: Chunk): Promise<AnalysisResult> {
     const prompt = `
-      Você é um Arquiteto de Software Especialista em Integrações.
-      Seu objetivo é extrair todas as menções a sistemas externos, APIs, webservices, integrações ou dependências de dados no texto abaixo.
+      Você é um Arquiteto de Software Especialista em Integrações. Sua tarefa é extrair SISTEMAS, APIs e DEPENDÊNCIAS.
       
-      Regras:
-      1. Identifique o nome do sistema ou serviço, o tipo de integração e a página de referência.
-      2. Verifique se há detalhes técnicos, pré-requisitos, formatos de dado, autenticação ou endpoints ausentes.
-      3. Aponte se a especificação está incompleta e quais informações faltam para evitar falhas na integração.
-      4. Retorne no formato JSON sugerido.
+      FOCO DA ANÁLISE (Páginas ${chunk.startPage} a ${chunk.endPage}):
+      ${this.usingCache ? "(O conteúdo completo está disponível no contexto de cache)" : chunk.content}
 
-      Texto do Documento (Páginas ${chunk.startPage} a ${chunk.endPage}):
-      ${chunk.content}
-
-      Retorne estritamente um JSON:
+      REQUISITO CRÍTICO DE FORMATO:
+      Retorne APENAS um objeto JSON no formato abaixo, sem Markdown, sem preâmbulo.
+      
+      ESTRUTURA ESPERADA:
       {
         "integracoes": [
           {
-            "sistema": string,
+            "sistema": "Nome do sistema/serviço",
             "status_especificacao": "Completo" | "Incompleto" | "Ausente",
-            "detalhe": string,
-            "pagina": string,
-            "impacto": string
+            "detalhe": "O que é integrado?",
+            "pagina": "${chunk.startPage}",
+            "impacto": "Risco técnico se faltar detalhamento"
           }
         ]
       }

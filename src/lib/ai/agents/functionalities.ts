@@ -6,6 +6,8 @@ export class FunctionalitiesAgent implements Agent {
   name = "Functionalities";
   private model: GenerativeModel;
 
+  private usingCache = false;
+
   constructor(apiKey: string) {
     const genAI = new GoogleGenerativeAI(apiKey);
     this.model = genAI.getGenerativeModel({
@@ -13,33 +15,34 @@ export class FunctionalitiesAgent implements Agent {
       generationConfig: {
         responseMimeType: "application/json",
         temperature: 0.1,
+        maxOutputTokens: 8192,
       },
     });
   }
 
+  setModel(model: GenerativeModel) {
+    this.model = model;
+    this.usingCache = true;
+  }
+
   async analyze(chunk: Chunk): Promise<AnalysisResult> {
     const prompt = `
-      Você é um Analista de Requisitos Sênior com foco em documentos que serão corrigidos pelo BP.
-      Seu objetivo é identificar TODAS as funcionalidades, comportamentos e validações esperadas descritas no texto abaixo.
+      Você é um Analista de Requisitos Sênior. Sua tarefa é extrair FUNCIONALIDADES PRINCIPAIS do texto abaixo.
       
-      Regras:
-      1. Liste apenas funcionalidades explicitamente descritas ou exigidas pelo contexto.
-      2. Para cada funcionalidade, registre título, descrição e referência de página.
-      3. Diferencie funcionalidades principais de validações e fluxos de exceção importantes.
-      4. Seja completo e preciso, apontando qualquer comportamento que pode impactar a entrega do produto.
-      5. Retorne no formato JSON sugerido.
+      FOCO DA ANÁLISE (Páginas ${chunk.startPage} a ${chunk.endPage}):
+      ${this.usingCache ? "(O conteúdo completo está disponível no contexto de cache)" : chunk.content}
 
-      Texto do Documento (Páginas ${chunk.startPage} a ${chunk.endPage}):
-      ${chunk.content}
-
-      Retorne estritamente um JSON:
+      REQUISITO CRÍTICO DE FORMATO:
+      Retorne APENAS um objeto JSON no formato abaixo, sem Markdown, sem preâmbulo.
+      
+      ESTRUTURA ESPERADA:
       {
         "funcionalidades": [
           {
-            "titulo": string,
-            "descricao": string,
-            "pagina": string,
-            "tipo": "Primária" | "Secundária" | "Validação"
+            "title": "Título Curto",
+            "description": "Explicação detalhada do comportamento",
+            "page_reference": "21",
+            "type": "functionality" | "validation"
           }
         ]
       }

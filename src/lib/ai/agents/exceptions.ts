@@ -6,6 +6,8 @@ export class ExceptionsAgent implements Agent {
   name = "Exceptions";
   private model: GenerativeModel;
 
+  private usingCache = false;
+
   constructor(apiKey: string) {
     const genAI = new GoogleGenerativeAI(apiKey);
     this.model = genAI.getGenerativeModel({
@@ -13,34 +15,35 @@ export class ExceptionsAgent implements Agent {
       generationConfig: {
         responseMimeType: "application/json",
         temperature: 0.1,
+        maxOutputTokens: 8192,
       },
     });
   }
 
+  setModel(model: GenerativeModel) {
+    this.model = model;
+    this.usingCache = true;
+  }
+
   async analyze(chunk: Chunk): Promise<AnalysisResult> {
     const prompt = `
-      Você é um Especialista em UX e QA Sênior.
-      Seu objetivo é identificar a ausência de tratamentos de erro, estados vazios (empty states), feedbacks e mensagens de sucesso/erro no texto abaixo.
+      Você é um Especialista em UX e QA Sênior. Sua tarefa é identificar ESTADOS DE ERRO E EXCEÇÕES AUSENTES.
       
-      Regras:
-      1. Procure por ações e fluxos que não definem o que acontece em caso de erro ou resultados nulos.
-      2. Identifique listagens que não contemplam o caso de "nenhum registro encontrado".
-      3. Aponte falta de mensagens de confirmação, sucesso ou validação de entrada.
-      4. Para cada item, indique o tipo, impacto e sugestão concreta.
-      5. Retorne no formato JSON sugerido.
+      FOCO DA ANÁLISE (Páginas ${chunk.startPage} a ${chunk.endPage}):
+      ${this.usingCache ? "(O conteúdo completo está disponível no contexto de cache)" : chunk.content}
 
-      Texto do Documento (Páginas ${chunk.startPage} a ${chunk.endPage}):
-      ${chunk.content}
-
-      Retorne estritamente um JSON:
+      REQUISITO CRÍTICO DE FORMATO:
+      Retorne APENAS um objeto JSON no formato abaixo, sem Markdown, sem preâmbulo.
+      
+      ESTRUTURA ESPERADA:
       {
         "problemas_ux": [
           {
-            "descricao": string,
-            "tipo": "Erro" | "Estado Vazio" | "Feedback Ausente" | "Confirmação Ausente",
-            "pagina": string,
-            "impacto": string,
-            "sugestao": string
+            "problema": "O que está faltando? (ex: feedback de erro, empty state)",
+            "impacto": "Alto" | "Médio" | "Baixo",
+            "sessao": "Nome da seção/tela",
+            "pagina": "${chunk.startPage}",
+            "sugestao_correcao": "O que deve ser adicionado no documento"
           }
         ]
       }
