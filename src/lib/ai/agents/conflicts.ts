@@ -1,5 +1,5 @@
 import { Agent, AnalysisResult, Chunk } from "../types";
-import { GoogleGenerativeAI, GenerativeModel, SchemaType, Schema } from "@google/generative-ai";
+import { GoogleGenerativeAI, GenerativeModel, SchemaType, Schema, GenerationConfig } from "@google/generative-ai";
 import { withRetry, safeParseJson } from "../utils";
 
 const conflictsSchema: Schema = {
@@ -11,11 +11,11 @@ const conflictsSchema: Schema = {
         type: SchemaType.OBJECT,
         properties: {
           problema: { type: SchemaType.STRING, description: "O que está em conflito?" },
-          gravidade: { 
-            type: SchemaType.STRING, 
+          gravidade: {
+            type: SchemaType.STRING,
             enum: ["Crítica", "Média", "Baixa"],
             format: "enum",
-            description: "Nível de severidade do conflito" 
+            description: "Nível de severidade do conflito"
           },
           pagina: { type: SchemaType.STRING, description: "Número da página de referência" },
           sugestao_correcao: { type: SchemaType.STRING, description: "Como o BP deve unificar a regra" }
@@ -27,6 +27,12 @@ const conflictsSchema: Schema = {
   required: ["conflitos"]
 };
 
+const GENERATION_CONFIG: GenerationConfig = {
+  responseMimeType: "application/json",
+  responseSchema: conflictsSchema,
+  temperature: 0.1,
+};
+
 export class ConflictsAgent implements Agent {
   name = "Conflicts";
   private model: GenerativeModel;
@@ -36,12 +42,8 @@ export class ConflictsAgent implements Agent {
     const genAI = new GoogleGenerativeAI(apiKey);
     this.model = genAI.getGenerativeModel({
       model: "gemini-2.5-flash",
-      systemInstruction: "Você é um Auditor de Sistemas e Especialista em Garantia de Qualidade. Sua tarefa única e exclusiva é identificar CONFLITOS E CONTRADIÇÕES em documentos de requisitos.",
-      generationConfig: {
-        responseMimeType: "application/json",
-        responseSchema: conflictsSchema,
-        temperature: 0.1,
-      },
+      systemInstruction: "Você é um Auditor de Sistemas e Especialista em Garantia de Qualidade. Sua tarefa única e exclusiva é identificar CONFLITOS E CONTRADIÇÕES em documentos de requisitos. Responda APENAS com JSON puro e válido, sem texto explicativo, sem markdown, sem formatação adicional.",
+      generationConfig: GENERATION_CONFIG,
     });
   }
 
@@ -53,16 +55,20 @@ export class ConflictsAgent implements Agent {
   async analyze(chunk: Chunk): Promise<AnalysisResult> {
     const prompt = `
       Analise o seguinte conteúdo (Páginas ${chunk.startPage} a ${chunk.endPage}) em busca de conflitos e contradições:
-      
+
       CONTEÚDO:
       ${this.usingCache ? "(O conteúdo completo está disponível no contexto de cache)" : chunk.content}
     `;
 
     let rawText = "";
     try {
-      const result = await withRetry(() => this.model.generateContent(prompt));
-      const response = await result.response;
-      rawText = response.text().trim();
+      const result = await withRetry(() =>
+        this.model.generateContent({
+          contents: [{ role: "user", parts: [{ text: prompt }] }],
+          generationConfig: GENERATION_CONFIG,
+        })
+      );
+      rawText = result.response.text().trim();
       const parsed = safeParseJson<{ conflitos?: any[] }>(rawText, "conflicts");
 
       if (!parsed || !parsed.conflitos || !Array.isArray(parsed.conflitos)) {

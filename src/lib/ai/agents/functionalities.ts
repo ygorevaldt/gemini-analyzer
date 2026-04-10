@@ -1,5 +1,5 @@
 import { Agent, AnalysisResult, Chunk } from "../types";
-import { GoogleGenerativeAI, GenerativeModel, SchemaType, Schema } from "@google/generative-ai";
+import { GoogleGenerativeAI, GenerativeModel, SchemaType, Schema, GenerationConfig } from "@google/generative-ai";
 import { withRetry, safeParseJson } from "../utils";
 
 const functionalitiesSchema: Schema = {
@@ -13,11 +13,11 @@ const functionalitiesSchema: Schema = {
           title: { type: SchemaType.STRING, description: "Título curto da funcionalidade" },
           description: { type: SchemaType.STRING, description: "Explicação detalhada do comportamento" },
           page_reference: { type: SchemaType.STRING, description: "Número da página" },
-          type: { 
-            type: SchemaType.STRING, 
+          type: {
+            type: SchemaType.STRING,
             enum: ["functionality", "validation"],
             format: "enum",
-            description: "Tipo de item extraído" 
+            description: "Tipo de item extraído"
           }
         },
         required: ["title", "description", "page_reference", "type"]
@@ -25,6 +25,12 @@ const functionalitiesSchema: Schema = {
     }
   },
   required: ["funcionalidades"]
+};
+
+const GENERATION_CONFIG: GenerationConfig = {
+  responseMimeType: "application/json",
+  responseSchema: functionalitiesSchema,
+  temperature: 0.1,
 };
 
 export class FunctionalitiesAgent implements Agent {
@@ -36,12 +42,8 @@ export class FunctionalitiesAgent implements Agent {
     const genAI = new GoogleGenerativeAI(apiKey);
     this.model = genAI.getGenerativeModel({
       model: "gemini-2.5-flash",
-      systemInstruction: "Você é um Analista de Requisitos Sênior. Sua tarefa única e exclusiva é extrair FUNCIONALIDADES PRINCIPAIS de documentos de requisitos.",
-      generationConfig: {
-        responseMimeType: "application/json",
-        responseSchema: functionalitiesSchema,
-        temperature: 0.1,
-      },
+      systemInstruction: "Você é um Analista de Requisitos Sênior. Sua tarefa única e exclusiva é extrair FUNCIONALIDADES PRINCIPAIS de documentos de requisitos. Responda APENAS com JSON puro e válido, sem texto explicativo, sem markdown, sem formatação adicional.",
+      generationConfig: GENERATION_CONFIG,
     });
   }
 
@@ -53,16 +55,20 @@ export class FunctionalitiesAgent implements Agent {
   async analyze(chunk: Chunk): Promise<AnalysisResult> {
     const prompt = `
       Extraia as funcionalidades e validações principais do seguinte conteúdo (Páginas ${chunk.startPage} a ${chunk.endPage}):
-      
+
       CONTEÚDO:
       ${this.usingCache ? "(O conteúdo completo está disponível no contexto de cache)" : chunk.content}
     `;
 
     let rawText = "";
     try {
-      const result = await withRetry(() => this.model.generateContent(prompt));
-      const response = await result.response;
-      rawText = response.text().trim();
+      const result = await withRetry(() =>
+        this.model.generateContent({
+          contents: [{ role: "user", parts: [{ text: prompt }] }],
+          generationConfig: GENERATION_CONFIG,
+        })
+      );
+      rawText = result.response.text().trim();
       const parsed = safeParseJson<{ funcionalidades?: any[] }>(rawText, "functionalities");
 
       if (!parsed || !parsed.funcionalidades || !Array.isArray(parsed.funcionalidades)) {

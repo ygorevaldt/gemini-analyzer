@@ -1,5 +1,5 @@
 import { AnalysisResult, Chunk } from "../types";
-import { GoogleGenerativeAI, GenerativeModel, SchemaType, Schema } from "@google/generative-ai";
+import { GoogleGenerativeAI, GenerativeModel, SchemaType, Schema, GenerationConfig } from "@google/generative-ai";
 import { withRetry, safeParseJson } from "../utils";
 
 const crossChunkSchema: Schema = {
@@ -12,17 +12,17 @@ const crossChunkSchema: Schema = {
         properties: {
           descricao: { type: SchemaType.STRING, description: "Descrição do conflito entre diferentes partes do documento" },
           pagina_referencia: { type: SchemaType.STRING, description: "Páginas envolvidas (ex: 2 e 15)" },
-          impacto: { 
-            type: SchemaType.STRING, 
+          impacto: {
+            type: SchemaType.STRING,
             enum: ["Alto", "Médio", "Baixo"],
             format: "enum",
-            description: "Gravidade do conflito global" 
+            description: "Gravidade do conflito global"
           },
-          tipo: { 
-            type: SchemaType.STRING, 
+          tipo: {
+            type: SchemaType.STRING,
             enum: ["Contradição", "Ambiguidade", "Inconsistência"],
             format: "enum",
-            description: "Natureza do problema" 
+            description: "Natureza do problema"
           },
           sugestao_correcao: { type: SchemaType.STRING, description: "Sugestão para unificar os requisitos" }
         },
@@ -31,6 +31,12 @@ const crossChunkSchema: Schema = {
     }
   },
   required: ["conflitos_cruzados"]
+};
+
+const GENERATION_CONFIG: GenerationConfig = {
+  responseMimeType: "application/json",
+  responseSchema: crossChunkSchema,
+  temperature: 0.1,
 };
 
 export class CrossChunkAgent {
@@ -42,12 +48,8 @@ export class CrossChunkAgent {
     const genAI = new GoogleGenerativeAI(apiKey);
     this.model = genAI.getGenerativeModel({
       model: "gemini-2.5-pro",
-      systemInstruction: "Você é um Auditor de Requisitos e Arquiteto de Sistemas Sênior. Sua tarefa única e exclusiva é identificar CONFLITOS CRUZADOS E INCONSISTÊNCIAS GLOBAIS entre diferentes partes de um documento.",
-      generationConfig: {
-        responseMimeType: "application/json",
-        responseSchema: crossChunkSchema,
-        temperature: 0.1,
-      },
+      systemInstruction: "Você é um Auditor de Requisitos e Arquiteto de Sistemas Sênior. Sua tarefa única e exclusiva é identificar CONFLITOS CRUZADOS E INCONSISTÊNCIAS GLOBAIS entre diferentes partes de um documento. Responda APENAS com JSON puro e válido, sem texto explicativo, sem markdown, sem formatação adicional.",
+      generationConfig: GENERATION_CONFIG,
     });
   }
 
@@ -59,7 +61,7 @@ export class CrossChunkAgent {
   async analyzeDocument(chunks: Chunk[], results: AnalysisResult[]): Promise<AnalysisResult> {
     const prompt = `
       Analise as inconsistências globais e conflitos cruzados no documento com base nos dados abaixo:
-      
+
       CONTEXTO DO DOCUMENTO:
       ${this.usingCache ? "(O conteúdo completo está disponível no contexto de cache)" : "CHUNKS: " + JSON.stringify(chunks.map(c => ({ id: c.id, pages: `${c.startPage}-${c.endPage}`, content: c.content })))}
 
@@ -73,9 +75,13 @@ export class CrossChunkAgent {
 
     let rawText = "";
     try {
-      const result = await withRetry(() => this.model.generateContent(prompt));
-      const response = await result.response;
-      rawText = response.text().trim();
+      const result = await withRetry(() =>
+        this.model.generateContent({
+          contents: [{ role: "user", parts: [{ text: prompt }] }],
+          generationConfig: GENERATION_CONFIG,
+        })
+      );
+      rawText = result.response.text().trim();
       const parsed = safeParseJson<{ conflitos_cruzados?: any[] }>(rawText, "cross-chunk");
 
       if (!parsed || !parsed.conflitos_cruzados || !Array.isArray(parsed.conflitos_cruzados)) {

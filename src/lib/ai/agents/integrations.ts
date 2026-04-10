@@ -1,5 +1,5 @@
 import { Agent, AnalysisResult, Chunk } from "../types";
-import { GoogleGenerativeAI, GenerativeModel, SchemaType, Schema } from "@google/generative-ai";
+import { GoogleGenerativeAI, GenerativeModel, SchemaType, Schema, GenerationConfig } from "@google/generative-ai";
 import { withRetry, safeParseJson } from "../utils";
 
 const integrationsSchema: Schema = {
@@ -11,11 +11,11 @@ const integrationsSchema: Schema = {
         type: SchemaType.OBJECT,
         properties: {
           sistema: { type: SchemaType.STRING, description: "Nome do sistema ou serviço integrado" },
-          status_especificacao: { 
-            type: SchemaType.STRING, 
+          status_especificacao: {
+            type: SchemaType.STRING,
             enum: ["Completo", "Incompleto", "Ausente"],
             format: "enum",
-            description: "Grau de detalhamento da integração" 
+            description: "Grau de detalhamento da integração"
           },
           detalhe: { type: SchemaType.STRING, description: "O que é integrado? (Processo, API, Banco de Dados)" },
           pagina: { type: SchemaType.STRING, description: "Número da página" },
@@ -28,6 +28,12 @@ const integrationsSchema: Schema = {
   required: ["integracoes"]
 };
 
+const GENERATION_CONFIG: GenerationConfig = {
+  responseMimeType: "application/json",
+  responseSchema: integrationsSchema,
+  temperature: 0.1,
+};
+
 export class IntegrationsAgent implements Agent {
   name = "Integrations";
   private model: GenerativeModel;
@@ -37,12 +43,8 @@ export class IntegrationsAgent implements Agent {
     const genAI = new GoogleGenerativeAI(apiKey);
     this.model = genAI.getGenerativeModel({
       model: "gemini-2.5-flash",
-      systemInstruction: "Você é um Arquiteto de Software Especialista em Integrações. Sua tarefa única e exclusiva é extrair SISTEMAS, APIs e DEPENDÊNCIAS de documentos de requisitos.",
-      generationConfig: {
-        responseMimeType: "application/json",
-        responseSchema: integrationsSchema,
-        temperature: 0.1,
-      },
+      systemInstruction: "Você é um Arquiteto de Software Especialista em Integrações. Sua tarefa única e exclusiva é extrair SISTEMAS, APIs e DEPENDÊNCIAS de documentos de requisitos. Responda APENAS com JSON puro e válido, sem texto explicativo, sem markdown, sem formatação adicional.",
+      generationConfig: GENERATION_CONFIG,
     });
   }
 
@@ -54,16 +56,20 @@ export class IntegrationsAgent implements Agent {
   async analyze(chunk: Chunk): Promise<AnalysisResult> {
     const prompt = `
       Extraia as integrações e dependências do seguinte conteúdo (Páginas ${chunk.startPage} a ${chunk.endPage}):
-      
+
       CONTEÚDO:
       ${this.usingCache ? "(O conteúdo completo está disponível no contexto de cache)" : chunk.content}
     `;
 
     let rawText = "";
     try {
-      const result = await withRetry(() => this.model.generateContent(prompt));
-      const response = await result.response;
-      rawText = response.text().trim();
+      const result = await withRetry(() =>
+        this.model.generateContent({
+          contents: [{ role: "user", parts: [{ text: prompt }] }],
+          generationConfig: GENERATION_CONFIG,
+        })
+      );
+      rawText = result.response.text().trim();
       const parsed = safeParseJson<{ integracoes?: any[] }>(rawText, "integrations");
 
       if (!parsed || !parsed.integracoes || !Array.isArray(parsed.integracoes)) {

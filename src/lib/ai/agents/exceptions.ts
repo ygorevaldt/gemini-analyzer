@@ -1,5 +1,5 @@
 import { Agent, AnalysisResult, Chunk } from "../types";
-import { GoogleGenerativeAI, GenerativeModel, SchemaType, Schema } from "@google/generative-ai";
+import { GoogleGenerativeAI, GenerativeModel, SchemaType, Schema, GenerationConfig } from "@google/generative-ai";
 import { withRetry, safeParseJson } from "../utils";
 
 const exceptionsSchema: Schema = {
@@ -11,11 +11,11 @@ const exceptionsSchema: Schema = {
         type: SchemaType.OBJECT,
         properties: {
           problema: { type: SchemaType.STRING, description: "O que está faltando? (ex: feedback de erro, empty state)" },
-          impacto: { 
-            type: SchemaType.STRING, 
+          impacto: {
+            type: SchemaType.STRING,
             enum: ["Alto", "Médio", "Baixo"],
             format: "enum",
-            description: "Impacto no negócio/usuário" 
+            description: "Impacto no negócio/usuário"
           },
           sessao: { type: SchemaType.STRING, description: "Nome da seção ou tela impactada" },
           pagina: { type: SchemaType.STRING, description: "Número da página" },
@@ -28,6 +28,12 @@ const exceptionsSchema: Schema = {
   required: ["problemas_ux"]
 };
 
+const GENERATION_CONFIG: GenerationConfig = {
+  responseMimeType: "application/json",
+  responseSchema: exceptionsSchema,
+  temperature: 0.1,
+};
+
 export class ExceptionsAgent implements Agent {
   name = "Exceptions";
   private model: GenerativeModel;
@@ -37,12 +43,8 @@ export class ExceptionsAgent implements Agent {
     const genAI = new GoogleGenerativeAI(apiKey);
     this.model = genAI.getGenerativeModel({
       model: "gemini-2.5-flash",
-      systemInstruction: "Você é um Especialista em UX e QA Sênior. Sua tarefa única e exclusiva é identificar ESTADOS DE ERRO E EXCEÇÕES AUSENTES em documentos de requisitos.",
-      generationConfig: {
-        responseMimeType: "application/json",
-        responseSchema: exceptionsSchema,
-        temperature: 0.1,
-      },
+      systemInstruction: "Você é um Especialista em UX e QA Sênior. Sua tarefa única e exclusiva é identificar ESTADOS DE ERRO E EXCEÇÕES AUSENTES em documentos de requisitos. Responda APENAS com JSON puro e válido, sem texto explicativo, sem markdown, sem formatação adicional.",
+      generationConfig: GENERATION_CONFIG,
     });
   }
 
@@ -54,16 +56,20 @@ export class ExceptionsAgent implements Agent {
   async analyze(chunk: Chunk): Promise<AnalysisResult> {
     const prompt = `
       Analise o seguinte conteúdo (Páginas ${chunk.startPage} a ${chunk.endPage}) em busca de estados de erro e exceções ausentes:
-      
+
       CONTEÚDO:
       ${this.usingCache ? "(O conteúdo completo está disponível no contexto de cache)" : chunk.content}
     `;
 
     let rawText = "";
     try {
-      const result = await withRetry(() => this.model.generateContent(prompt));
-      const response = await result.response;
-      rawText = response.text().trim();
+      const result = await withRetry(() =>
+        this.model.generateContent({
+          contents: [{ role: "user", parts: [{ text: prompt }] }],
+          generationConfig: GENERATION_CONFIG,
+        })
+      );
+      rawText = result.response.text().trim();
       const parsed = safeParseJson<{ problemas_ux?: any[] }>(rawText, "exceptions");
 
       if (!parsed || !parsed.problemas_ux || !Array.isArray(parsed.problemas_ux)) {

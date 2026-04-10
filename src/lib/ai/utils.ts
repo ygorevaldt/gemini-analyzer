@@ -44,8 +44,19 @@ function extractJsonObject(text: string): string | null {
 }
 
 function stripMarkdown(text: string): string {
-  // Removes Markdown code block wrappers like ```json and ```
-  return text.replace(/```(?:json)?\n?([\s\S]*?)```/g, "$1").trim();
+  // Remove Markdown code block wrappers like ```json ... ``` or ``` ... ```
+  const fenceStripped = text.replace(/```(?:json)?\n?([\s\S]*?)```/g, "$1").trim();
+
+  // If after stripping fences the text still doesn't start with { or [,
+  // it may be raw Markdown prose — discard everything before the first brace/bracket.
+  if (fenceStripped.length > 0 && fenceStripped[0] !== "{" && fenceStripped[0] !== "[") {
+    const firstBrace = fenceStripped.search(/[{[]/);
+    if (firstBrace !== -1) {
+      return fenceStripped.slice(firstBrace).trim();
+    }
+  }
+
+  return fenceStripped;
 }
 
 function sanitizeJsonText(text: string): string {

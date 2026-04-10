@@ -1,5 +1,5 @@
 import { AnalysisResult, FinalReport } from "./types";
-import { GoogleGenerativeAI, GenerativeModel, SchemaType, Schema } from "@google/generative-ai";
+import { GoogleGenerativeAI, GenerativeModel, SchemaType, Schema, GenerationConfig } from "@google/generative-ai";
 import { withRetry, safeParseJson } from "./utils";
 
 const aggregatorSchema: Schema = {
@@ -99,6 +99,12 @@ const aggregatorSchema: Schema = {
   ]
 };
 
+const GENERATION_CONFIG: GenerationConfig = {
+  responseMimeType: "application/json",
+  responseSchema: aggregatorSchema,
+  temperature: 0.1,
+};
+
 export class Aggregator {
   private model: GenerativeModel;
 
@@ -106,12 +112,8 @@ export class Aggregator {
     const genAI = new GoogleGenerativeAI(apiKey);
     this.model = genAI.getGenerativeModel({
       model: "gemini-2.5-pro",
-      systemInstruction: "Você é um Arquiteto de Soluções Sênior. Sua tarefa é consolidar os resultados de diversos agentes em um único RELATÓRIO TÉCNICO estruturado.",
-      generationConfig: {
-        responseMimeType: "application/json",
-        responseSchema: aggregatorSchema,
-        temperature: 0.1,
-      },
+      systemInstruction: "Você é um Arquiteto de Soluções Sênior. Sua tarefa é consolidar os resultados de diversos agentes em um único RELATÓRIO TÉCNICO estruturado. Responda APENAS com JSON puro e válido, sem texto explicativo, sem markdown, sem formatação adicional.",
+      generationConfig: GENERATION_CONFIG,
     });
   }
 
@@ -166,9 +168,13 @@ export class Aggregator {
 
     let rawText = "";
     try {
-      const result = await withRetry(() => this.model.generateContent(prompt));
-      const response = await result.response;
-      rawText = response.text().trim();
+      const result = await withRetry(() =>
+        this.model.generateContent({
+          contents: [{ role: "user", parts: [{ text: prompt }] }],
+          generationConfig: GENERATION_CONFIG,
+        })
+      );
+      rawText = result.response.text().trim();
       const parsed = safeParseJson<FinalReport>(rawText, "aggregator");
 
       if (!parsed) {
